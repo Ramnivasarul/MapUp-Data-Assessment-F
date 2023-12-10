@@ -159,7 +159,60 @@ def calculate_time_based_toll_rates(df)->pd.DataFrame():
         pandas.DataFrame
     """
     # Write your logic here
+     # Copy the input DataFrame to avoid modifying the original DataFrame
+    df = dataframe.copy()
+
+    # Define time ranges for weekdays and weekends
+    weekday_discounts = {
+        (time(0, 0, 0), time(10, 0, 0)): 0.8,
+        (time(10, 0, 0), time(18, 0, 0)): 1.2,
+        (time(18, 0, 0), time(23, 59, 59)): 0.8
+    }
+    weekend_discount = 0.7
+
+    # Create empty lists to store generated data
+    rows = []
+    
+    # Iterate through each unique (id_start, id_end) pair
+    for start_id, end_id in dataframe[['id_start', 'id_end']].drop_duplicates().values:
+        for day in range(7):  # 7 days in a week
+            for start_time, end_time in weekday_discounts.keys():
+                start_datetime = pd.Timestamp('2023-01-02') + pd.Timedelta(days=day) + pd.Timedelta(hours=start_time.hour, minutes=start_time.minute, seconds=start_time.second)
+                end_datetime = pd.Timestamp('2023-01-02') + pd.Timedelta(days=day) + pd.Timedelta(hours=end_time.hour, minutes=end_time.minute, seconds=end_time.second)
+
+                # Apply weekday or weekend discounts based on day and time ranges
+                if day < 5:  # Weekdays (Monday - Friday)
+                    discount_factor = weekday_discounts[(start_time, end_time)]
+                else:  # Weekends (Saturday and Sunday)
+                    discount_factor = weekend_discount
+
+                # Append the data to the list
+                rows.append({
+                    'id_start': start_id,
+                    'id_end': end_id,
+                    'start_day': start_datetime.strftime('%A'),
+                    'start_time': start_datetime.time(),
+                    'end_day': end_datetime.strftime('%A'),
+                    'end_time': end_datetime.time(),
+                    'discount_factor': discount_factor
+                })
+
+    # Convert the list of dictionaries to a DataFrame
+    time_based_toll_rates = pd.DataFrame(rows)
+
+    # Merge the generated DataFrame with the original DataFrame based on (id_start, id_end)
+    df = pd.merge(df, time_based_toll_rates, on=['id_start', 'id_end'])
+
+    # Calculate vehicle columns with discount factors
+    vehicle_columns = ['moto', 'car', 'rv', 'bus', 'truck']
+    for vehicle in vehicle_columns:
+        df[vehicle] *= df['discount_factor']
+
+    # Drop the temporary 'discount_factor' column
+    df.drop(columns='discount_factor', inplace=True)
 
     return df
+
+    
 df = pd.read_csv(r"C:\Users\ramni\Downloads\MapUp-Data-Assessment-F\datasets\dataset-3.csv")
 calculate_distance_matrix(df)
